@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { chosungOf, isChosungQuery } from "./hangul";
-import { searchQuick, type QuickEntry } from "./searchIndex";
+import { deriveKeys, searchQuick, type QuickEntry } from "./searchIndex";
 
 describe("chosungOf", () => {
   it("한글 음절 → 초성", () => {
@@ -47,8 +47,7 @@ describe("searchQuick — 초성 모드", () => {
       path: `/v/${label}.md`,
       primaryLabel: label,
       matchKeys,
-      matchKeysLower: matchKeys.map((k) => k.toLowerCase()),
-      chosungKeys: matchKeys.map(chosungOf),
+      ...deriveKeys(matchKeys),
       parentPath: "v",
     };
   }

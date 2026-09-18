@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { get } from "svelte/store";
 import { quickEntries } from "$lib/stores/search";
 import { unifiedSearchWithFallback } from "./palette";
-import type { QuickEntry } from "./searchIndex";
+import { deriveKeys, type QuickEntry } from "./searchIndex";
 
 /**
  * 한글 IME 되돌리기 — **0건일 때만** 도는가.
@@ -21,8 +21,8 @@ const entry = (name: string): QuickEntry => ({
   path: `/v/${name}.md`,
   primaryLabel: name,
   matchKeys: [name],
-  matchKeysLower: [name.toLowerCase()],
-  chosungKeys: [name.toLowerCase()],
+  // 파생 규칙의 주인은 `deriveKeys` 하나다 — 손으로 다시 만들지 않는다.
+  ...deriveKeys([name]),
   parentPath: "/v",
 });
 

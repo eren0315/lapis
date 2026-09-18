@@ -131,7 +131,7 @@ npm run tauri build
 산출물은 `src-tauri/target/release/bundle/`에 생깁니다.
 
 - **macOS** — `Lapis.app`을 `/Applications`로 옮기면 됩니다.
-- **Windows** — `bundle/nsis/`(또는 `bundle/msi/`)의 인스톨러를 실행하세요.
+- **Windows** — `bundle/nsis/`의 인스톨러를 실행하세요. (MSI는 기본으로 만들지 않습니다 — 필요하면 `npm run tauri build -- --bundles msi`.)
 
 > 개인용 도구라 배포·지원을 전제로 만들지 않았습니다. 일상 개발은 macOS 11+ / Apple Silicon에서 하고,
 > Windows 10+ (x64)는 CI가 Rust 검사·테스트를 양쪽에서 돌려 동작을 유지합니다. 다만 Windows는 손으로
@@ -316,7 +316,7 @@ cd src-tauri && cargo check    # Rust 타입 체크
 빌드:
 
 ```bash
-npm run tauri build                                    # 호스트 플랫폼 (macOS dmg / Windows nsis + msi)
+npm run tauri build                                    # 호스트 플랫폼 (macOS app + dmg / Windows nsis)
 npm run tauri build -- --target universal-apple-darwin # macOS universal binary
 npm run tauri build -- --bundles nsis                  # Windows 인스톨러만
 ```

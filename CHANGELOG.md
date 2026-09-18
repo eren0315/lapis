@@ -16,7 +16,39 @@ trimmed down for a one-person project. Versioning follows [Semantic Versioning](
 
 ## [Unreleased]
 
+### Added
+
+- **The palette no longer gives up over a single letter.** Filename search returned nothing for
+  `blogwrite` **seven times** while the note being looked for (`blog-writing-skill-…`) was sitting in
+  the vault. Matching was pure subsequence, so one missing letter — the `e` in `write`, which
+  `writing` does not contain — produced no result at all; `write` is not a prefix of `writing`, they
+  only agree as far as `writ`. Two changes, applied at deliberately different points: separators are
+  now ignored **always**, because people type `blogwrite` rather than `blog-write`, which restores the
+  run of characters a hyphen had broken and lifts ranking sharply; and inflected endings are folded
+  **only when there are no results at all**. Query and target are folded by the same rules — folding
+  only the target would let `parse` miss `parsing`. When a result was found that way, **the palette
+  says so**, on the same contract as the Korean IME retry: quietly substituting a different search
+  teaches people not to trust results. Searches that already work are never touched. The rules are a
+  declared suffix table rather than an edit-distance guess, and Korean is left alone. Honestly
+  measured: three of the seven logged cases resolve; mid-typing states like `blogwritei` need edit
+  distance, which this deliberately is not.
+
 ### Fixed
+
+- **`lapis open` overwrote the note it had just opened.** The usage log had five `[cli-open]` startup
+  failures carrying their own explanation: `Command plugin:window|set_focus not allowed by ACL`. The
+  window permission list was missing `set-focus`. The way the note disappeared is the unpleasant part:
+  opening it **succeeds**, focusing then throws, and the handler that catches it restores the previous
+  vault so as not to leave an empty window — overwriting what was just opened. `show` and `unminimize`
+  were undeclared at the same spot but swallowed outright, so a minimized window never came back and
+  nothing was logged. All three are declared now, and a focus failure no longer undoes an open that
+  already worked. The list is not maintained by hand any more: a check cross-references the window API
+  calls in the source against the declared permissions, and removing a permission was confirmed to make
+  it fail. The custom-titlebar example in Tauri's own documentation contains exactly the four
+  permissions this project had — following an example omits whatever the example does not use.
+- **Install instructions pointed at an installer that is no longer built.** MSI was dropped from the
+  default bundle set in the entry below, but both READMEs still directed people to `bundle/msi/`. They
+  now describe how to build one on demand instead.
 
 - **The bundle config promised installers it never produced.** With `"targets": "all"` only the NSIS
   installer was built, with no error and no warning, and the MSI had been silently absent for

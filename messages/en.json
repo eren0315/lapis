@@ -225,6 +225,7 @@
   "palette_status_building": "Building content index…",
   "palette_status_empty": "No results",
   "palette_ime_swapped": "No match — showing results for “{query}” (typed with the Korean IME on).",
+  "palette_stem_matched": "No match — showing results with word endings folded (e.g. “write” finds “writing”).",
   "palette_key_navigate": "↑↓ Navigate",
   "palette_key_run": "↵ Run",
   "palette_key_close": "Esc Close",

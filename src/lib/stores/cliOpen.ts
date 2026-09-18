@@ -60,7 +60,17 @@ async function apply(
   // 뒤이은 `openVault`가 탭을 자기 것으로 갈아치운다.
   if (needVault) await deps.openVault(pending.vault);
   await deps.selectNote(pending.path);
-  await deps.focus();
+
+  // 🔴 여기부터는 **노트가 이미 열렸다.** 포커스가 실패했다고 예외를 위로 던지면
+  // `startupCliOpen`의 catch가 `restoreVault()`로 떨어져 **방금 연 노트를 덮어쓴다.**
+  // 실제로 그랬다 — `core:window:allow-set-focus` 선언이 빠져 ACL이 거부했고,
+  // `lapis open`이 노트를 열었다가 지난 vault로 되돌아갔다(실사용 로그 5회).
+  // 권한은 선언했지만, 다음에 다른 이유로 포커스가 실패해도 열기는 이미 성공한 것이다.
+  try {
+    await deps.focus();
+  } catch (e) {
+    deps.warn("[cli-open] 포커스 실패", e);
+  }
   return "opened";
 }
 

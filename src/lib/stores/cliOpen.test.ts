@@ -136,6 +136,38 @@ describe("startupCliOpen — 창이 뜰 때", () => {
     expect(calls.restored).toBe(1);
     expect(calls.warned).toHaveLength(1);
   });
+
+  /**
+   * 🔴 focus 실패는 앞의 둘과 성격이 다르다 — **노트는 이미 열렸다.**
+   *
+   * 실사용 로그에서 `set_focus` 가 ACL 로 거부돼 5회 터졌고, 그때마다 catch 가 아래로
+   * 떨어져 `restoreVault()` 가 **방금 연 노트를 덮어썼다.** 권한은 선언했지만, 다음에
+   * 다른 이유로 포커스가 실패해도 노트를 잃으면 안 된다.
+   */
+  it("포커스가 실패해도 이미 연 노트는 지키고 복원하지 않는다", async () => {
+    const { deps: d, calls } = deps({
+      take: async (v) => (v === null ? pending : null),
+      focus: async () => {
+        throw new Error("Command plugin:window|set_focus not allowed by ACL");
+      },
+    });
+    await expect(startupCliOpen(d)).resolves.toBe("opened");
+    expect(calls.selectNote).toEqual(["/v/a.md"]);
+    expect(calls.restored).toBe(0);
+    expect(calls.warned).toHaveLength(1);
+  });
+
+  it("앱이 떠 있을 때도 포커스 실패가 열기를 무르지 않는다", async () => {
+    const { deps: d, calls } = deps({
+      take: async (v) => (v === "/v" ? pending : null),
+      focus: async () => {
+        throw new Error("ACL");
+      },
+    });
+    await expect(claimCliOpen(d)).resolves.toBe("opened");
+    expect(calls.selectNote).toEqual(["/v/a.md"]);
+    expect(calls.warned).toHaveLength(1);
+  });
 });
 
 describe("두 창이 동시에 물을 때", () => {

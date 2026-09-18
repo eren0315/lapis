@@ -95,6 +95,12 @@
    */
   let imeSwappedTo = $state<string | null>(null);
   /**
+   * 0건이라 **굴절을 접어** 찾았다. IME 되돌리기와 같은 이유로 반드시 보여준다.
+   *
+   * ⚠️ 이쪽은 질의를 바꾸지 않으므로 보여줄 문자열이 없다 — 접었다는 사실만 말한다.
+   */
+  let stemMatched = $state(false);
+  /**
    * 마지막으로 기록한 질의. 열림을 그 질의에 붙이기 위한 것.
    *
    * ⚠️ `$state` 가 아니다 — 화면이 안 읽는다. 룬으로 두면 쓸 때마다 재렌더가 돈다.
@@ -106,6 +112,7 @@
     if (!$paletteOpen) {
       results = [];
       imeSwappedTo = null;
+      stemMatched = false;
       return;
     }
     const q = query;
@@ -118,10 +125,15 @@
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const { results: r, imeSwappedTo: swapped } = await unifiedSearchWithFallback(q, hint);
+          const {
+            results: r,
+            imeSwappedTo: swapped,
+            stemMatched: stemmed,
+          } = await unifiedSearchWithFallback(q, hint);
           if (!cancelled) {
             results = r;
             imeSwappedTo = swapped ?? null;
+            stemMatched = stemmed === true;
             // ⚠️ **빈 질의는 안 남긴다.** Recent/Quick Actions 화면이라 검색이 아니다 —
             //    남기면 "결과 0건 질의"가 빈 문자열로 잔뜩 쌓인다.
             if (q.trim() !== "") {
@@ -135,6 +147,7 @@
             logWarn("CommandPalette", "unifiedSearch failed", e);
             results = [];
             imeSwappedTo = null;
+            stemMatched = false;
           }
         }
       })();
@@ -580,6 +593,11 @@
       {#if imeSwappedTo}
         <!-- 🔴 조용히 바꾸지 않는다. 무엇으로 찾았는지 말한다. -->
         <div class="status ime-swap">{m.palette_ime_swapped({ query: imeSwappedTo })}</div>
+      {/if}
+
+      {#if stemMatched}
+        <!-- 🔴 조용히 다른 것을 주지 않는다. 어떻게 찾았는지 말한다. -->
+        <div class="status ime-swap">{m.palette_stem_matched()}</div>
       {/if}
 
       {#if showContentBuildingHint}
