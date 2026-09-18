@@ -540,9 +540,18 @@ const PREVIEW_MAX = 120;
  * ⚠️ **길이 보존이 조용히 깨지는 종류의 계약이라 밖으로 낸다.** 길이가 어긋나도 예외는
  * 안 나고, 결과는 그럴듯한 줄 번호를 단 채 틀린다. 직접 겨냥한 테스트가 있어야 한다.
  */
-export function maskNonProse(body: string): string {
-  let out = body;
+/**
+ * 코드와 메타만 덮는다 — **문법이 실제로 쓰였나**를 셀 때 쓰는 조각.
+ *
+ * 🔴 `maskNonProse` 와 갈라 둔 이유가 있다. 저쪽은 **이미 걸린 링크까지** 덮는데,
+ * 그건 "안 걸린 언급"을 찾는 데 필요한 것이지 문법 수요를 셀 때는 **세려는 것을 지운다.**
+ * 실제로 그렇게 재서 위키링크가 0건으로 나왔다.
+ *
+ * 이쪽만 쓰면 코퍼스 측정이 `$lib/codeLines` 라는 같은 주인을 쓰면서도 링크를 셀 수 있다.
+ */
+export function maskCodeAndMeta(body: string): string {
   const blank = (m: string) => m.replace(/[^\n]/g, " ");
+  let out = body;
 
   // frontmatter — `title: 캐시 계약`이 자기 언급으로 잡히면 모든 노트가 자기를 언급한 게 된다.
   out = out.replace(/^---\n[\s\S]*?\n---/, blank);
@@ -553,6 +562,13 @@ export function maskNonProse(body: string): string {
   out = blankCodeBlocks(out);
   // 인라인 코드
   out = out.replace(/`[^`\n]*`/g, blank);
+  return out;
+}
+
+export function maskNonProse(body: string): string {
+  const blank = (m: string) => m.replace(/[^\n]/g, " ");
+  let out = maskCodeAndMeta(body);
+
   // ⚠️ **본문 첫 h1은 그 노트 자신의 이름이다.** 다른 노트의 제목과 같은 낱말이어도
   //    그건 남을 말한 게 아니라 자기를 말한 것이다.
   //
