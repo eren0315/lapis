@@ -2,6 +2,7 @@ import type { NoteContent, LinkInfo } from "$lib/tauri/notes";
 import { readNote } from "$lib/tauri/notes";
 import { snippetForQuery } from "$lib/snippet";
 import { chosungOf, isChosungQuery } from "$lib/hangul";
+import { stemPhrase } from "$lib/stem";
 import FullTextWorker from "./fullTextWorker?worker";
 import { logError, logWarn } from "$lib/stores/usage";
 
@@ -16,6 +17,10 @@ export interface QuickEntry {
   matchKeys: string[];    // 매칭 대상 (name, aliases, title 모두) — 표시·반환용 원본
   matchKeysLower: string[]; // matchKeys 소문자 선계산 (매 검색마다 toLowerCase 반복 회피)
   chosungKeys: string[];  // matchKeys와 1:1 초성 형태 (초성 쿼리 매칭용, 선계산; 이미 소문자)
+  /** matchKeys와 1:1. 구분자를 지운 소문자 형태. 원본과 같으면 `""` — 건너뛴다. */
+  strippedKeysLower: string[];
+  /** matchKeys와 1:1. 굴절을 접고 구분자를 지운 형태(0건 뒷문 전용). */
+  stemmedKeysLower: string[];
   parentPath: string;     // 부모 디렉토리 (UI 보조 표시용)
 }
 
@@ -23,6 +28,37 @@ export interface QuickHit {
   entry: QuickEntry;
   matchedKey: string;
   score: number;
+  /**
+   * 평범한 매칭이 **0건이라** 뒷문으로 찾았을 때만 붙는다.
+   *
+   * 🔴 화면은 이걸 반드시 보여줘야 한다. 조용히 다른 것을 찾아 주면 사용자는 왜 그게
+   * 나왔는지 모르고, 그러면 다음부터 결과 자체를 안 믿는다.
+   */
+  via?: "stem";
+}
+
+/** 파일명이 쓰는 낱말 구분자. */
+const SEPARATOR_RE = /[-_.\s/]+/g;
+
+/**
+ * 파생 키의 **단일 주인.** 앱과 테스트가 같은 것을 쓴다 — 갈라지면 테스트가 앱이
+ * 안 하는 일을 검증하게 된다(이 저장소가 여섯 번 당한 부류다).
+ */
+export function deriveKeys(matchKeys: string[]): Pick<
+  QuickEntry,
+  "matchKeysLower" | "chosungKeys" | "strippedKeysLower" | "stemmedKeysLower"
+> {
+  const lower = matchKeys.map((k) => k.toLowerCase());
+  return {
+    matchKeysLower: lower,
+    chosungKeys: matchKeys.map(chosungOf),
+    // 원본과 같으면 빈 문자열 — 같은 것을 두 번 재지 않는다
+    strippedKeysLower: lower.map((k) => {
+      const s = k.replace(SEPARATOR_RE, "");
+      return s === k ? "" : s;
+    }),
+    stemmedKeysLower: lower.map(stemPhrase),
+  };
 }
 
 export function buildQuickEntries(infos: LinkInfo[]): QuickEntry[] {
@@ -38,8 +74,8 @@ export function buildQuickEntries(infos: LinkInfo[]): QuickEntry[] {
       path: info.source_path,
       primaryLabel: info.title ?? info.source_name,
       matchKeys,
-      matchKeysLower: matchKeys.map((k) => k.toLowerCase()), // 검색마다 toLowerCase 반복 회피
-      chosungKeys: matchKeys.map(chosungOf), // 초성 쿼리 매칭용 선계산(키 입력마다 재계산 회피)
+      // 키 입력마다 재계산하지 않는다. 파생 규칙의 주인은 `deriveKeys` 하나다.
+      ...deriveKeys(matchKeys),
       parentPath: parent,
     };
   });
@@ -86,13 +122,60 @@ function scoreEntry(entry: QuickEntry, qLower: string, chosungMode: boolean): Qu
   const keys = chosungMode ? entry.chosungKeys : entry.matchKeysLower;
   let best: QuickHit | null = null;
   for (let i = 0; i < keys.length; i++) {
-    const score = fuzzyMatchLower(qLower, keys[i]);
+    let score = fuzzyMatchLower(qLower, keys[i]);
+    // ⚠️ 구분자를 지운 형태도 본다. 사람은 `blogwrite` 라고 치지 `blog-write` 라고 치지
+    //    않으므로, 하이픈이 끊어 놓은 연속 매칭이 여기서 살아난다(실측 144 → 784).
+    //    초성 모드는 대상이 아니다 — 초성 키에는 구분자가 없다.
+    if (!chosungMode) {
+      const stripped = entry.strippedKeysLower[i];
+      if (stripped) {
+        const alt = fuzzyMatchLower(qLower, stripped);
+        if (alt !== null && (score === null || alt > score)) score = alt;
+      }
+    }
     if (score === null) continue;
     if (!best || score > best.score) {
+      // 🔴 보여주는 것은 **원본 키**다. 접은 형태를 화면에 내면 사용자가 자기 파일명을 못 알아본다.
       best = { entry, matchedKey: entry.matchKeys[i], score };
     }
   }
   return best;
+}
+
+/**
+ * 굴절을 접은 키로만 본다. **평범한 매칭이 0건일 때만** 불린다.
+ *
+ * 🔴 되는 질의의 순위는 절대 안 건드린다 — 검색 품질을 바꾸는 변경이 아니라 막다른
+ * 골목에서만 여는 뒷문이다. IME 되돌리기(`unifiedSearchWithFallback`)와 같은 계약이다.
+ */
+function scoreEntryStemmed(entry: QuickEntry, qStem: string): QuickHit | null {
+  let best: QuickHit | null = null;
+  for (let i = 0; i < entry.stemmedKeysLower.length; i++) {
+    const score = fuzzyMatchLower(qStem, entry.stemmedKeysLower[i]);
+    if (score === null) continue;
+    if (!best || score > best.score) {
+      best = { entry, matchedKey: entry.matchKeys[i], score, via: "stem" };
+    }
+  }
+  return best;
+}
+
+/**
+ * 0건 뒷문 — 어간을 접어 한 번 더 찾는다.
+ *
+ * ⚠️ 초성 질의는 안 탄다. 접기 규칙은 라틴 문자에만 있다.
+ * ⚠️ 한 번만 시도한다. 접어도 0건이면 거기서 끝이다.
+ */
+function stemFallback(query: string, entries: QuickEntry[], chosungMode: boolean): QuickHit[] {
+  if (chosungMode) return [];
+  const qStem = stemPhrase(query);
+  if (!qStem) return [];
+  const hits: QuickHit[] = [];
+  for (const entry of entries) {
+    const best = scoreEntryStemmed(entry, qStem);
+    if (best) hits.push(best);
+  }
+  return hits;
 }
 
 /**
@@ -112,6 +195,7 @@ export function searchQuick(query: string, entries: QuickEntry[], limit = 30): Q
     const best = scoreEntry(entry, qLower, chosungMode);
     if (best) hits.push(best);
   }
+  if (hits.length === 0) hits.push(...stemFallback(qLower, entries, chosungMode));
   hits.sort((a, b) => b.score - a.score);
   return hits.slice(0, limit);
 }
@@ -171,7 +255,13 @@ export function searchQuickIncremental(query: string, entries: QuickEntry[], lim
   lastQuery = query;
   lastChosungMode = chosungMode;
   lastEntries = entries;
+  // ⚠️ 뒷문 결과는 후보군에 안 넣는다. subsequence 의 포함 관계가 성립하는 것은 평범한
+  //    매칭뿐이고, 접은 히트를 섞으면 다음 prefix 확장의 전제가 깨진다.
   lastCandidates = candidates;
+
+  // 🔴 뒷문은 좁혀진 후보군이 아니라 **entries 전체**를 본다. 평범한 매칭이 0건이면
+  //    후보군도 0이라, 거기서 찾으면 순수 구현과 답이 달라진다.
+  if (hits.length === 0) hits.push(...stemFallback(qLower, entries, chosungMode));
 
   hits.sort((a, b) => b.score - a.score);
   return hits.slice(0, limit);
