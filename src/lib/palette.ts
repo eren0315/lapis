@@ -74,6 +74,8 @@ export type PaletteEntry =
 export interface PaletteResult {
   entry: PaletteEntry;
   score: number;
+  /** 평범한 매칭이 0건이라 굴절을 접어 찾았다. 화면이 그렇다고 말해야 한다. */
+  via?: "stem";
 }
 
 export interface ParsedInput {
@@ -240,6 +242,7 @@ function matchFiles(query: string, entries: QuickEntry[], limit = 20): PaletteRe
           : h.entry.parentPath || undefined,
     },
     score: normalizedScore("note", h.score),
+    via: h.via,
   }));
 }
 
@@ -503,6 +506,13 @@ export interface UnifiedSearchOutcome {
    * 나왔는지 모르고, 그러면 다음부터 결과 자체를 안 믿는다.
    */
   imeSwappedTo?: string;
+  /**
+   * 평범한 매칭이 0건이라 **굴절을 접어** 찾았다(`write` ↔ `writing`).
+   *
+   * 🔴 IME 되돌리기와 같은 이유로 화면이 반드시 보여준다. 다만 이쪽은 질의를 바꾸지
+   * 않으므로 보여줄 문자열이 없다 — 접었다는 사실만 말한다.
+   */
+  stemMatched?: true;
 }
 
 /**
@@ -523,7 +533,12 @@ export async function unifiedSearchWithFallback(
   hint: PaletteMode = "all",
 ): Promise<UnifiedSearchOutcome> {
   const results = await unifiedSearch(input, hint);
-  if (results.length > 0) return { results };
+  // 🔴 어간 뒷문은 `searchQuick` 안에서 이미 0건을 조건으로 돌았다. 여기서는 **그렇게
+  //    찾았다는 사실을 밖으로 내보내는** 일만 한다 — 조용히 주면 사용자는 왜 그게
+  //    나왔는지 모르고, 그러면 다음부터 결과 자체를 안 믿는다.
+  if (results.length > 0) {
+    return results.some((r) => r.via === "stem") ? { results, stemMatched: true } : { results };
+  }
 
   const { query } = parseInput(input, hint);
   if (!query.trim()) return { results };

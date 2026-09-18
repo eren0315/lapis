@@ -225,6 +225,7 @@
   "palette_status_building": "본문 인덱스 빌드 중…",
   "palette_status_empty": "결과 없음",
   "palette_ime_swapped": "한글로 찍혀서 0건이었습니다 — “{query}” 로 찾은 결과입니다.",
+  "palette_stem_matched": "0건이라 어미를 접어 찾은 결과입니다 — 예: “write” 가 “writing” 을 찾습니다.",
   "palette_key_navigate": "↑↓ 탐색",
   "palette_key_run": "↵ 실행",
   "palette_key_close": "Esc 닫기",
