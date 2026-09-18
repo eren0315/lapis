@@ -16,6 +16,18 @@ trimmed down for a one-person project. Versioning follows [Semantic Versioning](
 
 ## [Unreleased]
 
+### Fixed
+
+- **The bundle config promised installers it never produced.** With `"targets": "all"` only the NSIS
+  installer was built, with no error and no warning, and the MSI had been silently absent for
+  **thirteen releases** before anyone noticed. The documentation says `"all"` means every supported
+  format; the measurement disagreed, and why they differ is still unknown — WiX works fine and
+  `--bundles msi` produces the installer on demand. The config now lists what to build explicitly, so
+  it states what actually happens; naming the macOS targets alongside the Windows one is safe on both
+  machines. MSI is no longer part of the default set. `npm run bundle:check` now verifies that every
+  promised bundle exists for the current version, and a test prevents the config from going back to
+  `"all"`.
+
 ## [3.11.0] — 2026-09-01
 
 ### Added
