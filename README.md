@@ -136,7 +136,7 @@ npm run tauri build
 The output lands in `src-tauri/target/release/bundle/`.
 
 - **macOS** — move `Lapis.app` into `/Applications`.
-- **Windows** — run the installer under `bundle/nsis/` (or `bundle/msi/`).
+- **Windows** — run the installer under `bundle/nsis/`. (An MSI is not built by default; `npm run tauri build -- --bundles msi` produces one on demand.)
 
 > This is a personal tool, not built with distribution or support in mind. Day-to-day development happens on
 > macOS 11+ / Apple Silicon; Windows 10+ (x64) is kept working by CI, which runs the Rust checks and tests on
@@ -395,7 +395,7 @@ the preview, not the code.
 Builds:
 
 ```bash
-npm run tauri build                                    # host platform (macOS dmg / Windows nsis + msi)
+npm run tauri build                                    # host platform (macOS app + dmg / Windows nsis)
 npm run tauri build -- --target universal-apple-darwin # macOS universal binary
 npm run tauri build -- --bundles nsis                  # Windows installer only
 ```
